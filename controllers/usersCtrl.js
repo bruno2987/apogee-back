@@ -64,7 +64,6 @@ exports.getOneArticle = (req, res) => {
 exports.getsixLastArticles = (req,res) => {
     conn.db.collection('articles').find({},{projection:{titre:1}}).limit(4).sort({createdDate:-1}).toArray(function (err, datas){
         if(datas){
-            console.log(datas)
             return res.status(201).json({articles:datas})
         } else {
             res.status(400).json({message:err})
@@ -81,4 +80,117 @@ exports.getFutureEvent = (req,res) => {
             console.log(err)
         }
     })
+}
+
+exports.getAllEvenements = (req,res) => {               // ici on affiche dans l'ordre croissant de la date de l'évènement
+    AllEvenements = conn.db.collection('evenements').find().sort({dateEvnmt:-1}).toArray(function (err, datas){
+        if(datas){
+            return res.status(201).json({articles: datas})
+        } else {
+            console.log(err)
+        }
+    })
+}
+
+exports.getOneEvenement = (req, res) => {
+    article = conn.db.collection('evenements').findOne({_id: new ObjectId(req.params.id)}, function(err, datas) {
+        dateComplete= DateTime.fromISO(datas.dateEvnmt).toFormat("y'-'LL'-'dd'-'HH'-'mm").split("-")
+        dateEvnmt= dateComplete[0]+'-'+dateComplete[1]+'-'+dateComplete[2]
+        datas.dateEvnmt= dateEvnmt
+        heureEvnmt = dateComplete[3]+':'+dateComplete[4]
+        datas.heureEvnmt= heureEvnmt
+        return res.status(201).json({article: datas})
+    })
+}
+
+exports.getAllWorkshops = (req,res) => {               // ici on affiche dans l'ordre croissant de la date de l'évènement
+    AllArticles = conn.db.collection('workshops').find().sort({dateEvnmt:-1}).toArray(function (err, datas){
+        if(datas){
+            return res.status(201).json({articles: datas})
+        } else {
+            console.log(err)
+        }
+    })
+}
+
+exports.getOneWorkshop = (req, res) => {
+    article = conn.db.collection('workshops').findOne({_id: new ObjectId(req.params.id)}, function(err, datas) {
+        dateComplete= DateTime.fromISO(datas.dateEvnmt).toFormat("y'-'LL'-'dd'-'HH'-'mm").split("-")
+        dateEvnmt= dateComplete[0]+'-'+dateComplete[1]+'-'+dateComplete[2]
+        datas.dateEvnmt= dateEvnmt
+        heureEvnmt = dateComplete[3]+':'+dateComplete[4]
+        datas.heureEvnmt= heureEvnmt
+        return res.status(201).json({article: datas})
+    })
+}
+
+// Requête mongo: ici la projection permet de définir le nombre de valeur dans un field grâce à l'opérateur "$slice": projection:{images:{"$slice": 1}}} --> on ne récupère que la première photo pour la liste
+// cela permet d'éviter de faire une requête plus lourde que nécessaire
+exports.getListeAlbums = (req,res) => {
+    listeAlbum = conn.db.collection('galerie').find({},{projection:{images:{"$slice": 1}}}).toArray(function(err, datas) {
+        return res.status(201).json({albumsListe: datas})
+    })
+}
+
+exports.getOneAlbum = (req,res) => {
+    album = conn.db.collection('galerie').findOne({_id: new ObjectId(req.params.id)}, function(err, datas) {
+        return res.status(201).json({album: datas})
+    })
+}
+
+exports.getAllContentListe = (req,res) => {
+
+    function getAllListes (){
+        return new Promise(function(resolve, reject) {
+            conn.db.collection('evenements').find({},{projection:{titre:1,createdDate:1,dateEvnmt:1}}).sort({dateEvnmt:-1}).toArray(function (err,datas1){
+                if(datas1){
+                    datas1.forEach(element =>{
+                        date = new DateTime(element.createdDate).toLocaleString(),
+                        element.createdDate = date})
+                    var evenements = datas1
+                    conn.db.collection('workshops').find({},{projection:{titre:1,createdDate:1,dateEvnmt:1}}).sort({dateEvnmt:-1}).toArray(function (err, datas2){
+                        if(datas2){
+                            datas2.forEach(element =>{
+                                date = new DateTime(element.createdDate).toLocaleString(),
+                                element.createdDate = date})
+                            var workshops = datas2
+                            conn.db.collection('articles').find({},{projection:{titre:1,createdDate:1}}).toArray(function (err, datas3) {
+                                if(datas3) {
+                                var articles = datas3
+                                datas3.forEach(element =>{
+                                    date = new DateTime(element.createdDate).toLocaleString(),
+                                    element.createdDate = date})
+                                var allListe = new Object();
+                                allListe.evenementsListe = evenements
+                                allListe.workshopsListe = workshops
+                                allListe.articlesListe = articles
+                                resolve(allListe)
+                                }
+                                else {
+                                    console.log(err)
+                                    reject(err)
+                                }
+                            })
+                        } else {
+                            reject(err) 
+                        }
+                    })
+                } else {
+                    reject(err)
+                }
+            })            
+        })
+    }
+
+    getAllListes()
+        .then(function(resultat){
+            res.status(201).json({
+                listeArticle : resultat.articlesListe,
+                listeWorkshop : resultat.workshopsListe,
+                listeEvenement : resultat.evenementsListe
+            })
+        })
+        .catch(function(err) {
+            console.log(err)
+        })
 }

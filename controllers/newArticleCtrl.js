@@ -1,10 +1,11 @@
 const path = require('path')
 const conn = require('./connectDb')
 const date = require('./formatDate')  // Une fonction a été créé pour pouvoir rapidement avoir la date au format iso (necessaire pour l'envoie dans base de donné mongoDb)
+var ObjectId = require('mongodb').ObjectID;
 const { DateTime } = require("luxon");
 
 // fs est un module qui permet de supprimer des fichiers: on require 'fs/promise' car c'est la fonction du module qui permet d'utiliser le module avec des promesses 
-const fs = require('fs');
+const fs = require('fs');   //module pour manipuler des fichiers
 
 const pathImg = path.join(__dirname,'../','../','frontend/apogee/public/imgArticles/');
 
@@ -14,7 +15,6 @@ var imgTab = [];
 exports.saveArticleImg = (req,res) => {
     res.json({location: '../imgArticles/'+ nameImg })
     imgTab.push(nameImg)
-    console.log(imgTab)
 }
 
 exports.deleteImg = (req,res) => {
@@ -65,7 +65,6 @@ exports.recordArticle = (req,res) => {
     // var dateEvnmt = date.dateIso(req.body.dateEvnmt,req.body.heureEvnmt)
     switch(req.body.typeContenu){
         case 'article':
-            console.log(req.body.typeContenu)
             conn.db.collection('articles').insertOne({
                 titre: req.body.titre,
                 corps: req.body.corps,
@@ -113,4 +112,104 @@ exports.recordArticle = (req,res) => {
                 break;             
     }
 
+}
+
+exports.updateArticle = (req,res) => {
+    req.body.imagesAncienneVersion.forEach(images => // req.body.imgArticle ne contient que les photos qui étaient présentes avant modification de l'article
+        imgTab.push(images))
+
+    corps = req.body.corps
+    var imgIndex = []
+    var imgCorps = []
+    var imgUploadButNotRecorded = []
+
+    pos = corps.indexOf('imgArt-')
+    while (pos != -1){
+        imgIndex.push(pos),
+        pos = corps.indexOf( "imgArt-",pos + 1 );
+    }
+
+
+    imgIndex.forEach(index =>
+        imgCorps.push(corps.substring(index, index + 24))
+        )
+
+    imgTab.forEach(imgUploaded => {
+        var todelete = 1
+        for (var i = 0 ; i < imgCorps.length; i++) {
+                if(imgCorps[i] == imgUploaded){
+                    todelete = 0
+                }
+            }
+            if (todelete>0){
+                imgUploadButNotRecorded.push(imgUploaded)
+            }
+            todelete = 1;
+        }
+    )
+
+    switch(req.body.typeContenu){
+        case 'article':
+            conn.db.collection('articles').updateOne({_id: new ObjectId(req.body.id)},{ $set:{
+                titre: req.body.titre,
+                corps: req.body.corps,
+                resume: req.body.resume,
+                imgArticle: imgCorps,               
+            }
+            },function(err, res){
+                if(err){
+                    console.log(err)
+                }
+            })
+            break;
+        case 'evenement':
+            var dateDelEvnmt = date.dateIso(req.body.dateEvnmt,req.body.heureEvnmt)
+
+            conn.db.collection('evenements').updateOne({_id: new ObjectId(req.body.id)},{ $set:{
+                titre: req.body.titre,
+                corps: req.body.corps,
+                resume: req.body.resume,
+                imgArticle: imgCorps,
+                dateEvnmt: dateDelEvnmt,
+                adresse: {
+                    nVoie: req.body.nVoie,
+                    commune: req.body.commune,
+                    zip: req.body.zip,
+                    description:req.body.description,
+                }
+            }
+            },function(err, res){
+            if(err){
+                console.log(err)
+                }
+            })
+            break;
+            case 'workshop':
+                var dateDelEvnmt = date.dateIso(req.body.dateEvnmt,req.body.heureEvnmt)
+    
+                conn.db.collection('workshops').updateOne({_id: new ObjectId(req.body.id)},{ $set:{
+                    titre: req.body.titre,
+                    corps: req.body.corps,
+                    resume: req.body.resume,
+                    imgArticle: imgCorps,
+                    dateEvnmt: dateDelEvnmt,
+                    nbrPlace: req.body.nbrPlace,
+                    adresse: {
+                        nVoie: req.body.nVoie,
+                        commune: req.body.commune,
+                        zip: req.body.zip,
+                        description:req.body.description,
+                    }
+                }
+                },function(err, res){
+                    if(err){
+                        console.log(err)
+                    }
+                })
+                break;             
+    }
+    imgUploadButNotRecorded.forEach(ImgNotrecord => {
+        fs.unlinkSync(ImgToDelete = pathImg+ImgNotrecord)
+        imgTab = []
+    })
 }
